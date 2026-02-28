@@ -1,0 +1,8 @@
+{
+  "name": "eduai-assistant",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@google/generative-ai": "^0.20.0"
+  }
+}

@@ -17,8 +17,13 @@ function App() {
     setLoading(true);
 
     try {
-      const url="http://localhost:5050/api/chat";
-      const res = await fetch(url, {
+      // Use environment-aware API URL
+      // In development: use localhost, in production: use relative path (Vercel handles it)
+      const apiUrl = import.meta.env.DEV 
+        ? "http://localhost:5050/api/chat"
+        : "/api/chat";
+      
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage.content })
