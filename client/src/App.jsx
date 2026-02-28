@@ -20,8 +20,8 @@ function App() {
       // Use environment-aware API URL
       // In development: use localhost, in production: use relative path (Vercel handles it)
       const apiUrl = import.meta.env.DEV 
-        ? "http://localhost:5050/api/chat"
-        : "/api/chat";
+        ? "http://localhost:5050/server/index"
+        : "/server/index";
       
       const res = await fetch(apiUrl, {
         method: 'POST',
