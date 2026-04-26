@@ -16,12 +16,20 @@ function App() {
     setError('');
     setLoading(true);
 
-    try {
-      // In development: Express server; in production: Vercel serverless /api/chat
-      const apiUrl = import.meta.env.DEV
-        ? 'http://localhost:5050/api/chat'
-        : '/api/chat';
+    //try {
+      // Use environment-aware API URL
+      // In development: use localhost, in production: use relative path (Vercel handles it)
+
+      // const apiUrl = import.meta.env.DEV 
+      //   ? "http://localhost:5050/api/chat"
+      //   : "/api/chat";
       
+      //const apiUrl="http://localhost:5050/server/index";
+      
+      try {
+      // Always use Express server at /server/index (dev: localhost, prod: set VITE_SERVER_URL if different)
+      const base = import.meta.env.VITE_SERVER_URL ?? (import.meta.env.DEV ? 'http://localhost:5050' : '');
+      const apiUrl = `${base}/server/index`;
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -19,49 +19,81 @@ app.use(cors());
 app.use(express.json());
 
 
-app.post('/api/chat', async (req, res) => {
-  try {
-    if (!genAI) {
-      return res.status(500).json({ 
-        error: 'Gemini API not configured on server. Please check your GEMINI_API_KEY in .env file.' 
+const CHAT_ROUTE = '/server/index';
+
+function handleChat(req, res) {
+  (async () => {
+    try {
+      if (!genAI) {
+        return res.status(503).json({
+          error: 'Chat is temporarily unavailable.',
+          hint: 'Set GEMINI_API_KEY in the server .env file and restart the server.',
+        });
+      }
+
+      const { message } = req.body;
+      if (message === undefined || message === null) {
+        return res.status(400).json({
+          error: 'Bad request: missing message.',
+          hint: 'Send a JSON body with { "message": "your text" }.',
+        });
+      }
+      if (typeof message !== 'string') {
+        return res.status(400).json({
+          error: 'Bad request: message must be a string.',
+        });
+      }
+      if (message.trim().length === 0) {
+        return res.status(400).json({
+          error: 'Bad request: message cannot be empty.',
+        });
+      }
+
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const prompt = `You are an educational assistant called eduAI. Answer clearly and helpfully.\n\nUser question: ${message}`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text?.() ?? (response.candidates?.[0]?.content?.parts?.[0]?.text ?? '');
+
+      if (!responseText) {
+        return res.status(502).json({
+          error: 'Got an empty reply from the AI. Please try again.',
+        });
+      }
+
+      res.json({ reply: responseText });
+    } catch (error) {
+      console.error(`Error in ${CHAT_ROUTE}:`, error);
+
+      let status = 500;
+      let errorMessage = 'Something went wrong while getting a reply.';
+
+      if (error.message) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes('quota') || msg.includes('rate') || msg.includes('resource_exhausted')) {
+          status = 429;
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (msg.includes('api key') || msg.includes('invalid') || msg.includes('401')) {
+          status = 503;
+          errorMessage = 'AI service is misconfigured. Please check the server API key.';
+        } else if (msg.includes('network') || msg.includes('econnrefused') || msg.includes('fetch')) {
+          status = 503;
+          errorMessage = 'Cannot reach the AI service. Please try again later.';
+        } else {
+          errorMessage += ` ${error.message}`;
+        }
+      }
+
+      res.status(status).json({
+        error: errorMessage,
+        ...(process.env.NODE_ENV === 'development' && { details: error.stack }),
       });
     }
+  })();
+}
 
-    const { message } = req.body;
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return res.status(400).json({ error: 'Invalid message. Message must be a non-empty string.' });
-    }
-
-    // Get the generative model
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-    // Create the prompt
-    const prompt = `You are an educational assistant called eduAI. Answer clearly and helpfully.\n\nUser question: ${message}`;
-
-    // Generate content
-    const result = await model.generateContent(prompt);
-    
-    const response = await result.response;
-    
-
-    const responseText = response.text();
-
-    res.json({ reply: responseText });
-  } catch (error) {
-    console.error('Error in /api/chat:', error);
-    
-    // Provide more detailed error information
-    let errorMessage = 'Internal server error calling Gemini.';
-    if (error.message) {
-      errorMessage += ` Details: ${error.message}`;
-    }
-    
-    res.status(500).json({ 
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-});
+app.post(CHAT_ROUTE, handleChat);
 
 app.listen(PORT, () => {
   console.log(`eduAI Assistant server listening on http://localhost:${PORT}`);
